@@ -19,19 +19,15 @@ print(path)
 #Load the video
 video = cv2.VideoCapture(path)
 #print(video.isOpened())
-_,mask = video.read()
-maskgray = cv2.cvtColor(mask, cv2.COLOR_BGR2GRAY)
+_, avg = video.read()
+avg1 = cv2.cvtColor(avg, cv2.COLOR_BGR2GRAY)
+avg2 = np.float32(avg1)
 
-#Setup the background subtraction masks
-#fgbg = cv2.createBackgroundSubtractorMOG2(history = 25, varThreshold = 60,
-#                detectShadows = False)
-#fgbgKK = cv2.createBackgroundSubtractorKNN(history = 25, dist2Threshold = 20.0,
-#                detectShadows = False)
-avg1 = np.float32(maskgray)
+
+kernel = np.ones((3,3), np.uint8)
 
 #Create the window and start the loop.
 cv2.namedWindow('Video', flags = cv2.WINDOW_NORMAL)
-#cv2.namedWindow('MOG', flags = cv2.WINDOW_NORMAL)
 #cv2.namedWindow('KNN', flags = cv2.WINDOW_NORMAL)
 cv2.namedWindow('Ave', flags = cv2.WINDOW_NORMAL)
 
@@ -40,19 +36,32 @@ while success == True:
     success, image = video.read()
     bwimage = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
     FPS = video.get(cv2.CAP_PROP_FPS)
-
-#    fgmask = fgbg.apply(image)
-#    knnmask = fgbg.apply(image)
-    cv2.accumulateWeighted(bwimage, avg1, 0.1)
-
+    
+    cv2.accumulateWeighted(bwimage, avg2, 0.01)
     res1 = cv2.convertScaleAbs(avg1)
+    fg = cv2.subtract(bwimage, res1)
+    
+    #fg2 = cv2.medianBlur(fg, 5)
+    fg3 = cv2.add(fg, fg)
+    _,thr = cv2.threshold(fg3, 20, 254, cv2.THRESH_BINARY)
+    morphEx = cv2.morphologyEx(thr, cv2.MORPH_OPEN, kernel)
+    morphEx2 = cv2.morphologyEx(morphEx, cv2.MORPH_CLOSE, kernel)
 
-    fg = cv2.absdiff(bwimage, res1)
+    cimg,contours0, hier = cv2.findContours(morphEx2, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    print 'new'
+    print contours0
+    contours = [cv2.approxPolyDP(cnt, 3, True) for cnt in contours0]
+    contours1 = [cv2.contourArea(cnt) for cnt in contours0]
+    #print contours
+    print contours1
+    #filt_cont = 
+    cv2.drawContours(image, contours0, -1, (128,255,255), 3)
+
+    #run through contour areas to filter out small contours.
     
     cv2.imshow('Video', image)
-#    cv2.imshow('MOG', fgmask)
-#    cv2.imshow('KNN', knnmask)
-    cv2.imshow('Ave', fg)
+    #cv2.imshow('KNN', thr)
+    cv2.imshow('Ave', morphEx2)
 #    cv2.waitKey(int(FPS/60*1000)) #Actual Playback Speed
     k = cv2.waitKey(10)
     if k == 27:
